@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
     boost::asio::io_service io_service;
 
 	//server(io_service, std::atoi(argv[1]));
-	server( io_service, 8080 );
+	server( io_service, 9000 );
   }
   catch (std::exception& e)
   {

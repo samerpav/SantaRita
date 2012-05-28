@@ -19,7 +19,7 @@
 
 // global variables!!!
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
-float resolution = 0.1f;
+float resolution = 0.01f;
 pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree (resolution);
 
 void myviewer(pcl::PointCloud<pcl::PointXYZ>::Ptr c, std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ>> voxel) {
@@ -99,63 +99,53 @@ Eigen::Vector3f FindPickPoint(Eigen::Vector3f v_origin, Eigen::Vector3f v_dir)
 	//Eigen::Vector3f v_origin = Eigen::Vector3f( 0.849, -2.379, 0.445);
 	//Eigen::Vector3f v_dir = Eigen::Vector3f( 0.019, 0.569, -0.822 );
 
-	std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ>> mypoints;
+	std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ>> intersectedVoxels;
+	std::cout << "# of Voxel found = " << octree.getIntersectedVoxelCenters(v_origin, v_dir, intersectedVoxels) << std::endl;
 
-	std::cout << "Voxel found = " << octree.getIntersectedVoxelCenters(v_origin, v_dir, mypoints) << std::endl;
-	for (size_t i=0; i < mypoints.size(); ++i) {
-		std::cout << mypoints[i].x << ' ' << mypoints[i].y << ' ' << mypoints[i].z << std::endl;
+	float dMin = 0.002;
+	Eigen::Vector3f bestPoint(Eigen::Vector3f::Zero());
+
+	for (size_t i=0; i < intersectedVoxels.size(); ++i) {
+		
+		// print voxel center coordinate
+		//std::cout << mypoints[i].x << ' ' << mypoints[i].y << ' ' << mypoints[i].z << std::endl;		
+		
 		std::vector<int> pointIdxVec;
-		if (octree.voxelSearch (mypoints[i], pointIdxVec)) {
+
+		if (octree.voxelSearch (intersectedVoxels[i], pointIdxVec)) {
 			std::cout << "       # of pts in voxel = " << pointIdxVec.size() << std::endl;
 			
 			for (size_t i = 0; i < pointIdxVec.size (); ++i) {
+
+				double d = pcl::sqrPointToLineDistance(
+													   Eigen::Vector4f(cloud->points[pointIdxVec[i]].x,
+																	   cloud->points[pointIdxVec[i]].y,
+																	   cloud->points[pointIdxVec[i]].z,
+																	   0),
+													   Eigen::Vector4f(v_origin[0], v_origin[1], v_origin[2], 0),
+													   Eigen::Vector4f(v_dir[0], v_dir[1], v_dir[2],  0)
+													  );
+
+				std::cout << "    " << cloud->points[pointIdxVec[i]].x << " " 
+									<< cloud->points[pointIdxVec[i]].y << " " 
+									<< cloud->points[pointIdxVec[i]].z << " "
+									<< "dist = " << d << std::endl;
+
+				if (d < dMin) {
+					dMin = d;
+					bestPoint = Eigen::Vector3f (cloud->points[pointIdxVec[i]].x,
+												cloud->points[pointIdxVec[i]].y,
+												cloud->points[pointIdxVec[i]].z);
+
+				}
 				//cloudPick->push_back( pcl::PointXYZ(cloud->points[pointIdxVec[i]].x, cloud->points[pointIdxVec[i]].y, cloud->points[pointIdxVec[i]].z) );
 				//std::cout << "    " << cloud->points[pointIdxVec[i]].x << " " << cloud->points[pointIdxVec[i]].y << " " << cloud->points[pointIdxVec[i]].z << std::endl;
-			}
-			
-		}
+			} // for
+		} // if
 	}
 
-	std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ>> voxelPoints;
-	std::vector<int> pointIdxVec;
-	if (octree.voxelSearch (mypoints[mypoints.size()-1], pointIdxVec)) {
-		std::cout << "       # of pts in outmost voxel = " << pointIdxVec.size() << std::endl;
-		for (size_t i = 0; i < pointIdxVec.size (); ++i) {
+	return bestPoint;
 
-			double d = pcl::sqrPointToLineDistance(
-												   Eigen::Vector4f(cloud->points[pointIdxVec[i]].x,
-																   cloud->points[pointIdxVec[i]].y,
-																   cloud->points[pointIdxVec[i]].z,
-																   0),
-												   Eigen::Vector4f(v_origin[0], v_origin[1], v_origin[2], 0), 
-												   Eigen::Vector4f(v_dir[0], v_dir[1], v_dir[2],  0)
-												   );
-
-			std::cout << "    " << cloud->points[pointIdxVec[i]].x << " " 
-								<< cloud->points[pointIdxVec[i]].y << " " 
-								<< cloud->points[pointIdxVec[i]].z << " "
-								<< "dist = " << d << std::endl;
-
-			if (d <= 0.002)
-				return Eigen::Vector3f (cloud->points[pointIdxVec[i]].x,
-										cloud->points[pointIdxVec[i]].y,
-										cloud->points[pointIdxVec[i]].z);
-			
-			/*
-			voxelPoints.push_back( pcl::PointXYZ(cloud->points[pointIdxVec[i]].x,
-												 cloud->points[pointIdxVec[i]].y,
-												 cloud->points[pointIdxVec[i]].z) );
-			*/
-		}
-	} // if
-
-	/*
-		mypoints are points in pcd
-		voxelPoints are points in outermost voxel
-	*/
-	//myviewer (cloud, mypoints);	
 	//myviewer (cloud, voxelPoints);
 	//_getch();
-
-	return Eigen::Vector3f::Zero();
 }
